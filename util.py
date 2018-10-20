@@ -11,5 +11,5 @@ def random_str():
     return ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(8))
 
 
-def epoch():
+def get_now():
     return int(time.time())
