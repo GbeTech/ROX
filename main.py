@@ -1,10 +1,10 @@
-# Attached is a word document containing the exercise, which is to implement an orderbook,
-# and a test which creates orders sends them to the book, and prints the resulting state of the orderbook/trades.
-# Notes:
-# - The orderbook doesn't need to be fancy, it should be reasonably efficient, avoiding long searches if possible.
+# implement an orderbook,
+# and a test which creates orders, sends them to the book,
+# and prints the resulting state of the orderbook/trades.
 
 # 1.Implement an order book class: here is a sample python API,
-# and a unit test to add bids, asks, show the orderbook afterwards, and show the trades
+# and a unit test to add bids, asks, show the orderbook afterwards,
+# and show the trades
 
 
 # The orderbook contains bid orders and ask orders,
@@ -29,7 +29,32 @@
 # and the orderbook will now contain an ask order with price=99, size=2
 # when a trade occurs, the subscribers (traders) need to be notified of the trade, and the trade should be logged
 
+# order sides
+BID = "b"
+ASK = "a"
+
+
+class Trade:
+    def __init__(self):
+        self.time: int  # seconds since epoch
+        self.size: int
+        self.price: int
+        self.buyer_id: str
+        self.seller_id: str
+
+
+class Order:
+    def __init__(self):
+        self.time: int  # seconds since epoch
+        self.side: str  # "b" (bid) or "a" (ask)
+        self.size: int
+        self.price: int
+        self.id: int
+        self.name: str
+
+
 class OrderBook:
+
     def __init__(self):
         self.bids = {}
         self.asks = {}
