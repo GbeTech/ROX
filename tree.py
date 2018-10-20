@@ -11,9 +11,7 @@ class Node:
         self.left = None
         self.right = None
 
-    # A utility function to insert a new node with given key in BST
-
-    def insert(self, key):
+    """def insert(self, key):
         # If the tree is empty, return a new node
         if self is None:
             return Node(key)
@@ -44,14 +42,15 @@ class Node:
         elif key > self.key:
             if self.right:
                 self.right = self.right.delete(key)
-            else:
-                self.right = Node(key)
+            # else:
+            #     self.right = Node(key)
 
         # If key is same as self's key, then this is the node
         # to be deleted
         else:
             # Node with only one child or no child
             if not self.left:
+                # reached left bottom (smallest value)
                 temp = self.right
                 self.key = None
                 return temp
@@ -63,16 +62,32 @@ class Node:
 
             # Node with two children: Get the inorder successor
             # (smallest in the right subtree)
-            temp = self.minimum()
+            # temp = self.minimum()
+            temp = minValueNode(self.right)
 
             # Copy the inorder successor's content to this node
             self.key = temp.key
 
             # Delete the inorder successor
             self.right = self.right.delete(temp.key)
-            self.left = self.left.delete(temp.key)
+            # self.left = self.left.delete(temp.key)
 
         return self
+
+    def get(self, key):
+        if self.key == key:
+            return self
+        if key < self.key:
+            if self.left:
+                return self.left.get(key)
+            return None
+
+        elif key > self.key:
+            if self.right:
+                return self.right.get(key)
+            return None
+
+        return None
 
     def minimum(self):
         current = self.left
@@ -96,14 +111,12 @@ class Node:
             self.left.pprint()
         print(self.key)
         if self.right:
-            self.right.pprint()
-            # else:
-            #     print(self.key), self.left.pprint()
+            self.right.pprint()"""
 
 
 def insert(node, key):
     # If the tree is empty, return a new node
-    if node is None:
+    if node.key is None:
         return Node(key)
 
     # Otherwise recur down the tree
@@ -117,8 +130,8 @@ def insert(node, key):
 
 
 # Given a non-empty binary search tree, return the node
-# with minum key value found in that tree. Note that the 
-# entire tree does not need to be searched 
+# with minum key value found in that tree. Note that the
+# entire tree does not need to be searched
 def minValueNode(node):
     current = node
 
@@ -130,7 +143,7 @@ def minValueNode(node):
 
 
 # Given a binary search tree and a key, this function
-# delete the key and returns the new root 
+# delete the key and returns the new root
 def deleteNode(root, key):
     # Base Case
     if root is None:
@@ -194,12 +207,14 @@ def inorder(root):
 # root.insert(40)
 # root.insert(30)
 # root.delete(4)
-# root.delete(50)
-# root.delete(60)
-# root.delete(40)
+# root.delete(50) # 60 40 30
+# root.delete(60) # 40 30
+# root.delete(40) # 30
 
 # root.pprint()
 
+# ret = root.get(2)
+# root.pprint()
 
 # inorder(root)
 
