@@ -26,7 +26,7 @@ class Node:
 
         # return the (unchanged) self pointer
 
-    def deleteNode(self, key):
+    def delete(self, key):
         # Base Case
         if not self.key:
             return None
@@ -35,7 +35,7 @@ class Node:
         # key then it lies in left subtree
         if key < self.key:
             if self.left:
-                self.left = self.left.deleteNode(key)
+                self.left = self.left.delete(key)
             # else:
             #     self.left = Node(key)
 
@@ -43,7 +43,7 @@ class Node:
         # then it lies in right subtree
         elif key > self.key:
             if self.right:
-                self.right = self.right.deleteNode(key)
+                self.right = self.right.delete(key)
             else:
                 self.right = Node(key)
 
@@ -63,23 +63,31 @@ class Node:
 
             # Node with two children: Get the inorder successor
             # (smallest in the right subtree)
-            temp = self.minValueNode()
+            temp = self.minimum()
 
             # Copy the inorder successor's content to this node
             self.key = temp.key
 
             # Delete the inorder successor
-            self.right = self.right.deleteNode(temp.key)
-            self.left = self.left.deleteNode(temp.key)
+            self.right = self.right.delete(temp.key)
+            self.left = self.left.delete(temp.key)
 
         return self
 
-    def minValueNode(self):
+    def minimum(self):
         current = self.left
 
         # loop down to find the leftmost leaf
-        while current.left is not None:
+        while current.left:
             current = current.left
+
+        return current
+
+    def maximum(self):
+        current = self.right
+
+        while current.right:
+            current = current.right
 
         return current
 
@@ -181,16 +189,18 @@ def inorder(root):
 	20 40 60 80 """
 
 # root = None
-root = Node(50)
-root.insert(60)
-root.insert(40)
-root.insert(50)
-root.deleteNode(4)
-root.deleteNode(50)
-root.deleteNode(60)
-# root.deleteNode(40)
+# root = Node(50)
+# root.insert(60)
+# root.insert(40)
+# root.insert(30)
+# root.delete(4)
+# root.delete(50)
+# root.delete(60)
+# root.delete(40)
 
-root.pprint()
+# root.pprint()
+
+
 # inorder(root)
 
 # root = insert(root, 30)
@@ -204,17 +214,17 @@ root.pprint()
 # inorder(root)
 #
 # print(f"Delete 20")
-# root = deleteNode(root, 20)
+# root = delete(root, 20)
 # print("Inorder traversal of the modified tree")
 # inorder(root)
 #
 # print("\nDelete 30")
-# root = deleteNode(root, 30)
+# root = delete(root, 30)
 # print("Inorder traversal of the modified tree")
 # inorder(root)
 #
 # print("\nDelete 50")
-# root = deleteNode(root, 50)
+# root = delete(root, 50)
 # print("Inorder traversal of the modified tree")
 # inorder(root)
 

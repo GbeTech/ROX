@@ -32,7 +32,7 @@
 import os
 from collections import OrderedDict
 from util import get_now, random_str
-
+import tree
 # order sides
 BID = "b"
 ASK = "a"
