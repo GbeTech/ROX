@@ -1,7 +1,8 @@
 # Python program to demonstrate delete operation 
 # in binary search tree 
 
-# A Binary Tree Node 
+# A Binary Tree Node
+
 class Node:
 
     # Constructor to create a new node
@@ -10,14 +11,86 @@ class Node:
         self.left = None
         self.right = None
 
-
-# A utility function to do inorder traversal of BST 
-def inorder(root):
-    if root is not None:
-        inorder(root.left)
-        print(root.key), inorder(root.right)
-
     # A utility function to insert a new node with given key in BST
+
+    def insert(self, key):
+        # If the tree is empty, return a new node
+        if self is None:
+            return Node(key)
+
+        # Otherwise recur down the tree
+        if key < self.key:
+            self.left = insert(self.left, key)
+        else:
+            self.right = insert(self.right, key)
+
+        # return the (unchanged) self pointer
+
+    def deleteNode(self, key):
+        # Base Case
+        if not self.key:
+            return None
+
+        # If the key to be deleted is smaller than the self's
+        # key then it lies in left subtree
+        if key < self.key:
+            if self.left:
+                self.left = self.left.deleteNode(key)
+            # else:
+            #     self.left = Node(key)
+
+        # If the kye to be delete is greater than the self's key
+        # then it lies in right subtree
+        elif key > self.key:
+            if self.right:
+                self.right = self.right.deleteNode(key)
+            else:
+                self.right = Node(key)
+
+        # If key is same as self's key, then this is the node
+        # to be deleted
+        else:
+            # Node with only one child or no child
+            if not self.left:
+                temp = self.right
+                self.key = None
+                return temp
+
+            elif not self.right:
+                temp = self.left
+                self.key = temp.key
+                return temp
+
+            # Node with two children: Get the inorder successor
+            # (smallest in the right subtree)
+            temp = self.minValueNode()
+
+            # Copy the inorder successor's content to this node
+            self.key = temp.key
+
+            # Delete the inorder successor
+            self.right = self.right.deleteNode(temp.key)
+            self.left = self.left.deleteNode(temp.key)
+
+        return self
+
+    def minValueNode(self):
+        current = self.left
+
+        # loop down to find the leftmost leaf
+        while current.left is not None:
+            current = current.left
+
+        return current
+
+    def pprint(self):
+        if self.left:
+            self.left.pprint()
+        print(self.key)
+        if self.right:
+            self.right.pprint()
+            # else:
+            #     print(self.key), self.left.pprint()
 
 
 def insert(node, key):
@@ -92,6 +165,13 @@ def deleteNode(root, key):
     return root
 
 
+# A utility function to do inorder traversal of BST
+def inorder(root):
+    if root is not None:
+        inorder(root.left)
+        print(root.key), inorder(root.right)
+
+
 # Driver program to test above functions
 """ Let us create following BST 
 			50 
@@ -100,31 +180,42 @@ def deleteNode(root, key):
 		/ \ / \ 
 	20 40 60 80 """
 
-root = None
-root = insert(root, 50)
-root = insert(root, 30)
-root = insert(root, 20)
-root = insert(root, 40)
-root = insert(root, 70)
-root = insert(root, 60)
-root = insert(root, 80)
+# root = None
+root = Node(50)
+root.insert(60)
+root.insert(40)
+root.insert(50)
+root.deleteNode(4)
+root.deleteNode(50)
+root.deleteNode(60)
+# root.deleteNode(40)
 
-print(f"Inorder traversal of the given tree")
-inorder(root)
+root.pprint()
+# inorder(root)
 
-print(f"Delete 20")
-root = deleteNode(root, 20)
-print("Inorder traversal of the modified tree")
-inorder(root)
+# root = insert(root, 30)
+# root = insert(root, 20)
+# root = insert(root, 40)
+# root = insert(root, 70)
+# root = insert(root, 60)
+# root = insert(root, 80)
 
-print("\nDelete 30")
-root = deleteNode(root, 30)
-print("Inorder traversal of the modified tree")
-inorder(root)
-
-print("\nDelete 50")
-root = deleteNode(root, 50)
-print("Inorder traversal of the modified tree")
-inorder(root)
+# print(f"Inorder traversal of the given tree")
+# inorder(root)
+#
+# print(f"Delete 20")
+# root = deleteNode(root, 20)
+# print("Inorder traversal of the modified tree")
+# inorder(root)
+#
+# print("\nDelete 30")
+# root = deleteNode(root, 30)
+# print("Inorder traversal of the modified tree")
+# inorder(root)
+#
+# print("\nDelete 50")
+# root = deleteNode(root, 50)
+# print("Inorder traversal of the modified tree")
+# inorder(root)
 
 # This code is contributed by Nikhil Kumar Singh(nickzuck_007)
