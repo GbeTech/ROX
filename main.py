@@ -143,14 +143,17 @@ class OrderBook:
         self.trades: _ABCTree = bintrees.AVLTree()
         self.log_file_name = log_file_name
 
+    # O(log(n))
     def show_top(self):
         """Returns the highest bid and lowest ask orders"""
         return self.bids.max_item(), self.asks.min_item()
 
+    # O(n)
     def show_trades(self):
         """Returns the list of trades sorted by time"""
         return sorted(self.trades.values(), key=lambda trade: trade.timestamp)
 
+    # O(n)
     def show_orderbook(self):
         """Prints the current state orderbook in a human readable format"""
         print("\nBids:")
@@ -167,6 +170,7 @@ class OrderBook:
 
     # Add an order, notify if a trade has occurred
     # record the order (and trade) in a log
+    # O(log(n))
     def add_order(self, order: Order, sender_id):
         """
         Logs the order to log file.
@@ -186,6 +190,7 @@ class OrderBook:
         else:
             self._add_ask(order)
 
+    # O(log(n))
     def _add_ask(self, ask: Order):
         ask_key = ask._key()
         self.asks.insert(ask_key, ask)
@@ -194,7 +199,7 @@ class OrderBook:
             # Stop when no matching bid was found, or when ask is exhausted (i.e. sell order fully satisfied)
             trade = self._try_sell(ask)
             if not trade:
-                # No one who's willing to buy this high was found
+                # Didn't find anyone who's willing to buy high enough
                 break
             self.trades.insert(trade._key(), trade)
             if ask.is_exhausted():
@@ -203,6 +208,7 @@ class OrderBook:
                 self.asks.pop(ask_key)
                 break
 
+    # O(log(n))
     def _add_bid(self, bid: Order):
         bid_key = bid._key()
         self.bids.insert(bid_key, bid)
@@ -211,7 +217,7 @@ class OrderBook:
             # Stop when no matching ask was found, or when bid is exhausted (i.e. buy order fully satisfied)
             trade = self._try_buy(bid)
             if not trade:
-                # No one who's willing to sell this low was found
+                # Didn't find anyone who's willing to sell low enough
                 break
             self.trades.insert(trade._key(), trade)
             if bid.is_exhausted():
@@ -232,7 +238,7 @@ class OrderBook:
     #
     #     else:  # order is an ASK
     #         return self._try_sell(order)
-
+    # O(log(n))
     def _try_buy(self, bid: Order) -> Trade or None:
         """
         Finalizes a trade between the passed bid and the lowest ask order in orderbook,
@@ -252,6 +258,7 @@ class OrderBook:
 
         return trade
 
+    # O(log(n))
     def _try_sell(self, ask: Order) -> Trade or None:
         """
         Finalizes a trade between the passed ask and the highest bid order in orderbook,
