@@ -2,6 +2,15 @@ from util import get_now
 import bintrees
 import logging
 
+ALLOW_SUBSCRIBERS_NOTIFICATION = False
+warning = '\n'.join([
+    'WARNING:',
+    'main.py(5): "ALLOW_SUBSCRIBERS_NOTIFICATION" is set to False.',
+    'This is to prevent the notifications from spamming the console while testing.',
+    'If you still want to see the notifications, set "ALLOW_SUBSCRIBERS_NOTIFICATION" to True.\n',
+    ])
+print(warning)
+
 
 class Logger:
     def __init__(self, filename):
@@ -156,7 +165,6 @@ class Subscriber:
     def notify(self, trade: Trade):
         """Notifies the subscriber of a trade event relating to one her of orders.
         Sends an email to her address, specifying the trade's details, total expense/income, and the status of the order."""
-        return
         import time
 
         if trade.buyer_id == self.id:
@@ -167,10 +175,11 @@ class Subscriber:
             msg = self._generate_asker_msg(trade)
 
         _connect = lambda port: print(f'\n***Server connected to port: {port}')
-        _sendmail = lambda address, text: (print(f'\nSending email to {address}:\n\t{text}'),
-                                           time.sleep(1),
-                                           print('\nEmail sent successfully'))
-        _quit = lambda: print('\nServer closed***')
+
+        _sendmail = lambda address, text: (print(f'\nSending email to {address}:\n\t{text}')
+                                           or time.sleep(1)
+                                           or print('\nEmail sent successfully'))
+        _quit = lambda: print('\nConnection closed***')
 
         mock_server = {'connect':  _connect,
                        'sendmail': _sendmail,
@@ -189,8 +198,9 @@ class Subscriber:
             Total income: {trade_total_value}$.'''
         if bid_ask_difference:
             msg += f'''
-            This is {bid_ask_difference} additional dollars a unit, compared to your original sell offer (at {trade.ask.price}$),
-            which translate to {bid_ask_difference*trade.size}$ above what you have originally planned.  
+            Those are {bid_ask_difference} additional dollars per unit, compared to your original sell offer (at {trade.ask.price}$),
+            which translate to {bid_ask_difference*trade.size}$ above what you have originally planned.
+            Go buy yourself some ice cream. You deserve it.
             '''
         if trade.ask.is_exhausted():
             msg += 'Your ask requirements were fully satisfied.'
@@ -257,8 +267,9 @@ class OrderBook:
 
     def notify_trade(self, trade, subscribers):
         """Notifies each of the passed subscribers of the trade event."""
-        for subscriber in subscribers:
-            subscriber.notify(trade)
+        if ALLOW_SUBSCRIBERS_NOTIFICATION:
+            for subscriber in subscribers:
+                subscriber.notify(trade)
 
     # O(log(n))
     def add_order(self, order: Order, sender_id):

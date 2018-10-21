@@ -196,6 +196,7 @@ class TestOrderBook(unittest.TestCase):
         order = Order("a", 100, 5)
         order.size = -5
         self.assertIsNone(order.size)
+        self.assertTrue(order.is_exhausted())
 
     def test_bad_order_side(self):
         bad_side = "not a nor b"
@@ -205,7 +206,6 @@ class TestOrderBook(unittest.TestCase):
             ])
         with self.assertRaisesRegex(ValueError, err_regex):
             Order(bad_side, 100, 5)
-
     def test_remove_order(self):
         order_book = self.create_mock_orderbook(f'{TESTS_FOLDER_NAME}/{self._testMethodName}.log')
         ask = self.create_ask(100, 30)
