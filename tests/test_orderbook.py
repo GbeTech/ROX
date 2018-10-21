@@ -134,8 +134,8 @@ class TestOrderBook(unittest.TestCase):
 
     def test_show_trades(self):
         order_book = self.create_mock_orderbook(f'{TESTS_FOLDER_NAME}/{self._testMethodName}.log')
-        for _ in range(26):
-            order_book.add_order(self.create_ask(99, 1), random_str())
+        for _ in range(3):
+            order_book.add_order(self.create_ask(99, 10), random_str())
             # sleep(0.1)
 
         trades = order_book.show_trades()
