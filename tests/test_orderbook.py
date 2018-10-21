@@ -17,7 +17,7 @@ if m:
 
 
 class TestOrderBook(unittest.TestCase):
-    REMOVE_LOG_FILES = False  # set True to delete all log files created by the tests after done running
+    REMOVE_LOG_FILES = True  # set True to delete all log files created by the tests after done running
 
     @classmethod
     def tearDownClass(cls):

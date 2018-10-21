@@ -37,9 +37,30 @@ import bintrees
 import logging
 
 
-class Subscriber:
-    def __init__(self):
-        pass
+class Logger:
+    def __init__(self, filename):
+        self.filename = filename
+        logging.basicConfig(format='%(message)s',
+                            filename=filename,
+                            level=logging.INFO,
+                            filemode='w')
+
+    def log_bid(self, bid):
+        logging.info(f'BID | {bid}')
+
+    def log_ask(self, ask):
+        logging.info(f'ASK | {ask}')
+
+    def log_trade(self, trade, bid, ask):
+        logging.info(f'TRADE | {trade}')
+        if ask.is_exhausted():
+            logging.info(f'\t--> ASK id: {ask.id} now has been exhausted')
+        else:
+            logging.info(f'\t--> ASK id: {ask.id} now has size: {ask.size}')
+        if bid.is_exhausted():
+            logging.info(f'\t--> BID id: {bid.id} now has been exhausted')
+        else:
+            logging.info(f'\t--> BID id: {bid.id} now has size: {bid.size}')
 
 
 class Order:
@@ -106,6 +127,8 @@ class Trade:
         self.price = bid.price
         self.buyer_id = bid.sender_id
         self.seller_id = ask.sender_id
+        self.bid = bid
+        self.ask = ask
 
     def _key(self):
         """Trades are compared firstly by price. In case of equal prices, sizes are compared.
@@ -126,34 +149,68 @@ class Trade:
 
         return trade_size
 
+    def total_value(self):
+        return self.price * self.size
+
+    def bid_ask_difference(self):
+        return self.price - self.ask.price
+
     def __repr__(self):
         return f'timestamp: {self.timestamp}, price: {self.price}, size: {self.size}, buyer_id: "{self.buyer_id}", seller_id: "{self.seller_id}"'
 
 
-class Logger:
-    def __init__(self, filename):
-        self.filename = filename
-        logging.basicConfig(format='%(message)s',
-                            filename=filename,
-                            level=logging.INFO,
-                            filemode='w')
+class Subscriber:
+    def __init__(self, sender_id):
+        self.id = sender_id
+        self.email = f"{self.id}@example.com"
+        self.orders_ids = []
 
-    def log_bid(self, bid):
-        logging.info(f'BID | {bid}')
+    def subscribed_to(self, *orders):
+        for order in orders:
+            if order.id in self.orders_ids:
+                return True
+        return False
 
-    def log_ask(self, ask):
-        logging.info(f'ASK | {ask}')
-
-    def log_trade(self, trade, bid, ask):
-        logging.info(f'TRADE | {trade}')
-        if ask.is_exhausted():
-            logging.info(f'\t--> ASK id: {ask.id} now has been exhausted')
+    def notify(self, trade_event: Trade):
+        import time
+        trade_total_value = trade_event.total_value()
+        bid_ask_difference = trade_event.bid_ask_difference()
+        if trade_event.buyer_id == self.id:
+            msg = f'''
+            A trade has been completed with your bid order, id: {trade_event.bid.id}.
+            {trade_event.size} units have been bought at {trade_event.price}$ each.
+            Total expenses: {trade_total_value}$. 
+            '''
+            if trade_event.bid.is_exhausted():
+                msg += 'Your bid requirements were fully satisfied.'
+            else:
+                msg += f'Your bid was not exhausted: {trade_event.bid.size } units left to buy.'
         else:
-            logging.info(f'\t--> ASK id: {ask.id} now has size: {ask.size}')
-        if bid.is_exhausted():
-            logging.info(f'\t--> BID id: {bid.id} now has been exhausted')
-        else:
-            logging.info(f'\t--> BID id: {bid.id} now has size: {bid.size}')
+            msg = f'''
+            A trade has been completed with your ask order, id: {trade_event.ask.id}.
+            {trade_event.size} units have been sold at {trade_event.price}$ each. 
+            Total income: {trade_total_value}$.
+            This is {bid_ask_difference} additional dollars a unit, compared to your original sell offer (at {trade_event.ask.price}$),
+            which translate to {bid_ask_difference*trade_event.size}$ above what you have originally planned.  
+            '''
+            if trade_event.ask.is_exhausted():
+                msg += 'Your ask requirements were fully satisfied.'
+            else:
+                msg += f'Your ask was not exhausted: {trade_event.ask.size} units left to sell.'
+
+        _connect = lambda port: print(f'\n***\nServer connected to port: {port}')
+        _sendmail = lambda address, text: (print(f'\nSending email to {address}:\n\t{text}'),
+                                           time.sleep(1),
+                                           print('\nEmail sent successfully'))
+        _quit = lambda: print('\nServer closed\n***')
+
+        mock_server = {'connect':  _connect,
+                       'sendmail': _sendmail,
+                       'quit':     _quit, }
+
+        mock_server['connect'](25)
+        mock_server['sendmail'](self.email, msg)
+        mock_server['quit']()
 
 
 class OrderBook:
@@ -161,7 +218,8 @@ class OrderBook:
     def __init__(self, logfile_full_path='logs/orderbook.log'):
         self.bids: _ABCTree = bintrees.AVLTree()
         self.asks: _ABCTree = bintrees.AVLTree()
-        self.trades: _ABCTree = bintrees.AVLTree()
+        self.trades = {}
+        self.subscribers = {}
         self.logger = Logger(logfile_full_path)
 
     # O(log(n))
@@ -186,7 +244,9 @@ class OrderBook:
             print(f'({i}) {ask}')
 
     # called by add_order, when a trade has occurred, notify subscribers of the trade
-    def notify_trade(self, trade_event: Trade, subscribers: [Subscriber]):
+    def notify_trade(self, trade_event, subscribers):
+        for subscriber in subscribers:
+            subscriber.notify(trade_event)
         return
 
     # Add an order, notify if a trade has occurred
@@ -202,6 +262,16 @@ class OrderBook:
         Calls self._add_ask if order.side is Order.ASK, otherwise calls self._add_bid
         """
         order.sender_id = sender_id
+
+        # Add order to subscriber's orders. Create new subscriber if none was found
+        subscriber: Subscriber = self.subscribers.get(sender_id)
+        if subscriber:
+            subscriber.orders_ids.append(order.id)
+        else:
+            subscriber = Subscriber(sender_id)
+            subscriber.orders_ids.append(order.id)
+            self.subscribers[sender_id] = subscriber
+
         if order.side == Order.BID:
             self._add_bid(order)
 
@@ -220,7 +290,7 @@ class OrderBook:
             trade = self._try_sell(ask)
             if trade:
                 # Found someone who's willing to buy high enough
-                self.trades.insert(trade._key(), trade)
+                self.trades[trade._key()] = trade
                 if ask.is_exhausted():
                     # The order was fully sold
                     # Remove it from tree
@@ -241,8 +311,7 @@ class OrderBook:
             trade = self._try_buy(bid)
             if trade:
                 # Found someone who's willing to sell low enough
-                self.trades.insert(trade._key(), trade)
-
+                self.trades[trade._key()] = trade
                 if bid.is_exhausted():
                     # The order was fully bought
                     # Remove it from tree
@@ -255,6 +324,10 @@ class OrderBook:
     # record the removal order in the log
     def remove_order(self, order_id, sender_id):
         return
+
+    def _subscribers_of_orders(self, *orders):
+        return [sub for sub in self.subscribers.values() if
+                sub.subscribed_to(*orders)]
 
     # def make_trade(self, order):
     #     # print(f'OrderBook.make_trade(order = {order.id})')
@@ -278,9 +351,16 @@ class OrderBook:
         trade = None
         if lowest_ask <= bid:  # someone offered a low-enough sell price and a trade will be made
             trade = Trade(bid, lowest_ask)
+
+            # log trade
             self.logger.log_trade(trade, bid, lowest_ask)
-            trade_subscribers = bid.subscribers.extend(lowest_ask.subscribers)
+
+            # get all who subscribed to either side
+            trade_subscribers = self._subscribers_of_orders(bid, lowest_ask)
+
+            # notify them about the trade
             self.notify_trade(trade, trade_subscribers)
+
             if lowest_ask.is_exhausted():
                 self.asks.pop(ask_key)
 
@@ -302,6 +382,13 @@ class OrderBook:
         if highest_bid >= ask:  # someone bid high enough and a trade will be made
             trade = Trade(highest_bid, ask)
             self.logger.log_trade(trade, highest_bid, ask)
+
+            # get all who subscribed to either side
+            trade_subscribers = self._subscribers_of_orders(highest_bid, ask)
+
+            # notify them about the trade
+            self.notify_trade(trade, trade_subscribers)
+
             if highest_bid.is_exhausted():
                 self.bids.pop(bid_key)
 
