@@ -55,6 +55,9 @@ class Order:
     def __le__(self, other):
         return self._key() <= other._key()
 
+    def __eq__(self, other):
+        return self._key() == other._key()
+
     def __init__(self, side, price, size):
         """
         :param side:
