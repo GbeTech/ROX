@@ -29,7 +29,7 @@
 # and the orderbook will now contain an ask order with price=99, size=2
 # when a trade occurs, the subscribers (traders) need to be notified of the trade,
 # and the trade should be logged
-
+from bintrees.abctree import _ABCTree
 
 from util import get_now
 import bintrees
@@ -160,7 +160,6 @@ class Trade:
 
 
 class Subscriber:
-    MOCK_EMAIL_DELAY = 0  # set to 0 if heavy testing
 
     def __init__(self, sender_id):
         self.id = sender_id
@@ -177,7 +176,7 @@ class Subscriber:
     def notify(self, trade_event: Trade):
         """Notifies the subscriber of a trade event relating to one her of orders.
         Sends an email to her address, specifying the trade's details, total expense/income, and the status of the order."""
-
+        return
         import time
 
         if trade_event.buyer_id == self.id:
@@ -189,7 +188,7 @@ class Subscriber:
 
         _connect = lambda port: print(f'\n***Server connected to port: {port}')
         _sendmail = lambda address, text: (print(f'\nSending email to {address}:\n\t{text}'),
-                                           time.sleep(self.MOCK_EMAIL_DELAY),
+                                           time.sleep(1),
                                            print('\nEmail sent successfully'))
         _quit = lambda: print('\nServer closed***')
 
@@ -235,8 +234,8 @@ class Subscriber:
 class OrderBook:
 
     def __init__(self, logfile_full_path='logs/orderbook.log'):
-        self.bids = bintrees.AVLTree()
-        self.asks = bintrees.AVLTree()
+        self.bids: _ABCTree = bintrees.AVLTree()
+        self.asks: _ABCTree = bintrees.AVLTree()
         self.trades = {}
         self.subscribers = {}
         self.logger = Logger(logfile_full_path)
@@ -342,7 +341,11 @@ class OrderBook:
     # remove an order
     # record the removal order in the log
     def remove_order(self, order_id, sender_id):
-        return
+        import asyncio
+        for bid_key, bid in self.bids.items():
+            if bid.id == order_id and bid.sender_id == sender_id:
+                self.bids.pop(bid_key)
+                return
 
     def _subscribers_of_orders(self, *orders):
         """Returns a list of Subscribers that have subscribed to any of the passed orders"""

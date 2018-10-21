@@ -17,7 +17,7 @@ if m:
 
 
 class TestOrderBook(unittest.TestCase):
-    REMOVE_LOG_FILES = True  # set True to delete all log files created by the tests after done running
+    REMOVE_LOG_FILES = False  # set True to delete all log files created by the tests after done running
 
     @classmethod
     def tearDownClass(cls):
@@ -134,14 +134,22 @@ class TestOrderBook(unittest.TestCase):
 
     def test_show_trades(self):
         order_book = self.create_mock_orderbook(f'{TESTS_FOLDER_NAME}/{self._testMethodName}.log')
-        for _ in range(3):
-            order_book.add_order(self.create_ask(99, 10), random_str())
-            # sleep(0.1)
+        for _ in range(26):
+            order_book.add_order(self.create_ask(99, 1), random_str())
 
         trades = order_book.show_trades()
         trades_are_timestamp_sorted = all(
             [trade.timestamp < trades[i + 1].timestamp for i, trade in enumerate(trades[:-1])])
         self.assertTrue(trades_are_timestamp_sorted)
+
+    def test_remove_order(self):
+        order_book = self.create_mock_orderbook(f'{TESTS_FOLDER_NAME}/{self._testMethodName}.log')
+        ask = self.create_ask(100, 30)
+        order_book.add_order(ask, random_str())
+        self.assertEqual(order_book.asks.count, 1)
+        self.assertEqual(order_book.bids.count, 3)
+        order_book.remove_order(ask.id, ask.sender_id)
+        self.assertEqual(order_book.asks.count, 0)
 
     def test_logger(self):
         new_log_file = f'{TESTS_FOLDER_NAME}/{self._testMethodName}.log'
