@@ -109,7 +109,7 @@ class TestOrderBook(unittest.TestCase):
         min_bid_key, min_bid = order_book.bids.min_item()
         max_bid_key, max_bid = order_book.bids.max_item()
         self.assertEqual(order_book.bids.count, 4)
-        self.assertEqual(order_book.asks.count, 0)
+        self.assertTrue(order_book.asks.is_empty())
         self.assertEqual(min_bid.size, 15)
         self.assertEqual(min_bid.price, 70)
         self.assertEqual(max_bid.size, 9)
@@ -120,7 +120,7 @@ class TestOrderBook(unittest.TestCase):
         # order_book.pprint()
 
         self.assertEqual(order_book.bids.count, 4)
-        self.assertEqual(order_book.asks.count, 0)
+        self.assertTrue(order_book.asks.is_empty())
 
         self.assertEqual(min_bid.size, 15)
         self.assertEqual(min_bid.price, 70)
@@ -130,7 +130,23 @@ class TestOrderBook(unittest.TestCase):
 
     def test_show_orderbook(self):
         order_book = self.create_mock_orderbook(f'{TESTS_FOLDER_NAME}/{self._testMethodName}.log')
-        order_book.show_orderbook()
+        output = order_book.show_orderbook()
+        lines = output.splitlines()
+
+        regex = ['^$',
+                 '^Bids:$',
+                 '^\(0\) timestamp: \d{10}\.\d{5,7}, side: b, price: 70, size: 15, id: \d{13}, sender_id: "[a-zA-Z0-9]{8}"',
+                 '^\(1\) timestamp: \d{10}\.\d{5,7}, side: b, price: 99, size: 7, id: \d{13}, sender_id: "[a-zA-Z0-9]{8}"',
+                 '^\(2\) timestamp: \d{10}\.\d{5,7}, side: b, price: 100, size: 10, id: \d{13}, sender_id: "[a-zA-Z0-9]{8}"',
+                 '^\(3\) timestamp: \d{10}\.\d{5,7}, side: b, price: 101, size: 9, id: \d{13}, sender_id: "[a-zA-Z0-9]{8}"',
+                 '^Asks:$',
+                 '-- No asks --',
+                 ]
+
+        for i, line in enumerate(lines):
+            self.assertRegex(line, regex[i])
+
+        # print(output)
 
     def test_show_trades(self):
         order_book = self.create_mock_orderbook(f'{TESTS_FOLDER_NAME}/{self._testMethodName}.log')
@@ -177,19 +193,19 @@ class TestOrderBook(unittest.TestCase):
         with open(new_log_file, 'r') as f:
             lines = f.readlines()
             # the data in the now created log file is expected to match the following regex expressions
-            regex = [['BID \| timestamp: \d{10}\.\d{6}',
+            regex = [['BID \| timestamp: \d{10}\.\d{5,7}',
                       '^side: b$',
                       '^price: 100$',
                       '^size: 5$',
                       'id: \d{13}',
                       f'sender_id: "{bid_sender_id}"'],
-                     ['ASK \| timestamp: \d{10}\.\d{6}',
+                     ['ASK \| timestamp: \d{10}\.\d{5,7}',
                       '^side: a$',
                       '^price: 90$',
                       '^size: 7$',
                       'id: \d{13}',
                       f'sender_id: "{ask_sender_id}"'],
-                     ['TRADE \| timestamp: \d{10}\.\d{6}',
+                     ['TRADE \| timestamp: \d{10}\.\d{5,7}',
                       '^price: 100$',
                       '^size: 5$',
                       f'buyer_id: "{bid_sender_id}"',

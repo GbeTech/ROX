@@ -271,19 +271,27 @@ class OrderBook:
     # O(n)
     def show_orderbook(self):
         """Prints the current state orderbook in a human readable format"""
-        print("\nBids:")
+        msg = '\nBids:'
+        # print("\nBids:")
         if self.bids.is_empty():
-            print('-- No bids --')
+            msg += '\n-- No bids --'
+            # print('-- No bids --')
         else:
             for i, bid in enumerate(self.bids.values()):
-                print(f'({i}) {bid}')
+                msg += f'\n({i}) {bid}'
+                # print(f'({i}) {bid}')
 
-        print("\nAsks:")
+        msg += "\nAsks:"
+        # print("\nAsks:")
         if self.asks.is_empty():
-            print('-- No asks --')
+            msg += '\n-- No asks --'
+            # print('-- No asks --')
         else:
             for i, ask in enumerate(self.asks.values()):
-                print(f'({i}) {ask}')
+                msg += f'\n({i}) {ask}'
+                # print(f'({i}) {ask}')
+        print(msg)
+        return msg
 
     def notify_trade(self, trade, subscribers):
         """Notifies each of the passed subscribers of the trade event."""
