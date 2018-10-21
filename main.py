@@ -93,9 +93,9 @@ class Order:
             self._size = value
 
     def _key(self):
-        """Orders are compared firstly by price. In case of equal prices, sizes are compared, then timestamp.
-        Two equal Orders must have the same price, size, and timestamp."""
-        return self.price, self.size, self.timestamp
+        """Orders are compared firstly by price. In case of equal prices, sizes are compared.
+        Two equal Orders must have the same price and size."""
+        return self.price, self.size
 
     def is_exhausted(self):
         return not self.size
@@ -112,6 +112,11 @@ class Trade:
         self.buyer_id = bid.sender_id
         self.seller_id = ask.sender_id
 
+    def _key(self):
+        """Trades are compared firstly by price. In case of equal prices, sizes are compared.
+        Two equal Trades must have the same price and size."""
+        return self.price, self.size
+
     @staticmethod
     def _finalize(bid: Order, ask: Order):
         """Finalizes the trade between passed bid and ask.
@@ -125,11 +130,6 @@ class Trade:
         ask.size -= smallest_size
 
         return trade_size
-
-    def _key(self):
-        """Trades are compared firstly by price. In case of equal prices, sizes are compared, then timestamp.
-        Two equal Trades must have the same price, size, and timestamp."""
-        return self.price, self.size, self.timestamp
 
     def __repr__(self):
         return f'timestamp: {self.timestamp}, price: {self.price}, size: {self.size}, buyer_id: "{self.buyer_id}", seller_id: "{self.seller_id}"'
@@ -181,8 +181,8 @@ class OrderBook:
         Calls self._add_ask if order.side is Order.ASK, otherwise calls self._add_bid
         """
         order.sender_id = sender_id
-        with open(os.path.join('logs', self.log_file_name), 'a') as log:
-            log.writelines([repr(order), '\n'])
+        # with open(os.path.join('logs', self.log_file_name), 'a') as log:
+        #     log.writelines([repr(order), '\n'])
 
         if order.side == Order.BID:
             self._add_bid(order)
@@ -212,19 +212,21 @@ class OrderBook:
     def _add_bid(self, bid: Order):
         bid_key = bid._key()
         self.bids.insert(bid_key, bid)
-        while True:
+        should_continue = True
+        while should_continue:
             # Keep trying to finalize trades with current order (bid)
             # Stop when no matching ask was found, or when bid is exhausted (i.e. buy order fully satisfied)
             trade = self._try_buy(bid)
-            if not trade:
-                # Didn't find anyone who's willing to sell low enough
-                break
-            self.trades.insert(trade._key(), trade)
-            if bid.is_exhausted():
-                # The order was fully bought
-                # Remove it from tree
-                self.bids.pop(bid_key)
-                break
+            if trade:
+                # Found someone who's willing to sell low enough
+                self.trades.insert(trade._key(), trade)
+                if bid.is_exhausted():
+                    # The order was fully bought
+                    # Remove it from tree
+                    self.bids.pop(bid_key)
+                    should_continue = False
+            else:
+                should_continue = False
 
     # remove an order
     # record the removal order in the log
@@ -245,12 +247,12 @@ class OrderBook:
         given passed bid is higher or equal to the lowest ask.
         Returns a Trade if one was finalized, otherwise returns None.
         """
-        trade = None
         try:
             ask_key, lowest_ask = self.asks.min_item()
         except ValueError:  # self.asks is empty
-            return trade
+            return None
 
+        trade = None
         if lowest_ask <= bid:  # someone offered a low-enough sell price and a trade will be made
             trade = Trade(bid, lowest_ask)
             if lowest_ask.is_exhausted():
@@ -265,12 +267,12 @@ class OrderBook:
         given passed ask is lower or equal to the highest bid.
         Returns a Trade if one was finalized, otherwise returns None.
         """
-        trade = None
         try:
             bid_key, highest_bid = self.bids.max_item()
         except ValueError:  # self.bids is empty
-            return trade
+            return None
 
+        trade = None
         if highest_bid >= ask:  # someone bid high enough and a trade will be made
             trade = Trade(highest_bid, ask)
             if highest_bid.is_exhausted():

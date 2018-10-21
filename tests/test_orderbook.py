@@ -31,7 +31,7 @@ class TestOrderBook(unittest.TestCase):
 
     def test_add_ask_yes_bid_exhaust(self):
         order_book = self.create_mock_orderbook()
-        # print("\n BEFORE")
+        print("\n BEFORE")
         order_book.show_orderbook()
         _, min_bid_before = order_book.bids.min_item()
         _, max_bid_before = order_book.bids.max_item()
@@ -43,8 +43,8 @@ class TestOrderBook(unittest.TestCase):
         self.assertEqual(max_bid_before.price, 101)
 
         order_book.add_order(self.create_ask(99, 26), random_str())
-        # print("\n AFTER")
-        # order_book.show_orderbook()
+        print("\n AFTER")
+        order_book.show_orderbook()
 
         self.assertEqual(order_book.bids.count, 1)
         self.assertEqual(order_book.asks.count, 0)
