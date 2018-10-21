@@ -248,7 +248,7 @@ class OrderBook:
         trade = None
         try:
             ask_key, lowest_ask = self.asks.min_item()
-        except ValueError:  # self.asks is empty: no asks to match passed bid
+        except ValueError:  # self.asks is empty
             return trade
 
         if lowest_ask <= bid:  # someone offered a low-enough sell price and a trade will be made
@@ -268,7 +268,7 @@ class OrderBook:
         trade = None
         try:
             bid_key, highest_bid = self.bids.max_item()
-        except ValueError:  # self.bids is empty: no bids to match passed ask
+        except ValueError:  # self.bids is empty
             return trade
 
         if highest_bid >= ask:  # someone bid high enough and a trade will be made
