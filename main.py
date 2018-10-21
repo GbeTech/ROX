@@ -87,7 +87,7 @@ class Order:
     @size.setter
     def size(self, value):
         """Normalize Order.size property to None whenever size has been "exhausted".
-        This happens when set to 0, negative number or or any "illegal" value (None, False, empty str etc)"""
+        This happens when size is set to 0, negative number or or any "illegal" value (None, False, empty str etc)"""
         if not value or value < 0:
             self._size = None
         else:
@@ -126,6 +126,9 @@ class Trade:
 
         return trade_size
 
+    def _key(self):
+        return self.price, self.size, self.timestamp
+
     def __repr__(self):
         return self.print_data()
 
@@ -138,6 +141,7 @@ class OrderBook:
     def __init__(self, log_file_name='test_log.log'):
         self.bids: _ABCTree = bintrees.AVLTree()
         self.asks: _ABCTree = bintrees.AVLTree()
+        self.trades: _ABCTree = bintrees.AVLTree()
         self.log_file_name = log_file_name
 
     # Returns the highest bid and lowest ask orders
@@ -152,7 +156,7 @@ class OrderBook:
 
     # print the current state orderbook in a human readable format
     def show_orderbook(self):
-        return
+        self.pprint()
 
     # called by add_order, when a trade has occurred, notify subscribers of the trade
     def notify_trade(self, trade_event, subscribers):
@@ -168,15 +172,15 @@ class OrderBook:
         Returns a list of Trade if any were finalized, otherwise an empty list.
         """
         order.sender_id = sender_id
-        trades = []
+        # trades = []
         order_key = order._key()
         if order.side == Order.BID:
             self.bids.insert(order_key, order)
             while True:
-                finalized_trades = self._try_buy(order)
-                if not finalized_trades:
+                trade = self._try_buy(order)
+                if not trade:
                     break
-                trades.extend(finalized_trades)
+                self.trades.insert(trade._key(), trade)
                 if order.is_exhausted():
                     self.bids.pop(order_key)
                     break
@@ -184,14 +188,14 @@ class OrderBook:
         else:
             self.asks.insert(order_key, order)
             while True:
-                finalized_trades = self._try_sell(order)
-                if not finalized_trades:
+                trade = self._try_sell(order)
+                if not trade:
                     break
-                trades.extend(finalized_trades)
+                self.trades.insert(trade._key(), trade)
                 if order.is_exhausted():
                     self.asks.pop(order_key)
                     break
-        return trades
+
         # with open(os.path.join('logs', self.log_file_name), 'a') as log:
         #     log.writelines([order.print_data(), '\n'])
 
@@ -208,43 +212,43 @@ class OrderBook:
     #     else:  # order is an ASK
     #         return self._try_sell(order)
 
-    def _try_buy(self, bid: Order) -> [Trade]:
+    def _try_buy(self, bid: Order) -> Trade or None:
         """
         Finalizes a trade between the passed bid and the lowest ask order, if passed bid is higher or equal to the lowest ask.
         Tries to finalize more trades until bid is exhausted.
         Returns a list of Trade or an empty list of none was finalized.
         """
-        trades = []
+        trade = None
         try:
             ask_key, lowest_ask = self.asks.min_item()
         except ValueError:  # self.asks is empty: no asks to match passed bid
-            return trades
+            return trade
 
         if lowest_ask <= bid:  # someone offered a low-enough sell price and a trade will be made
-            trades.append(Trade(bid, lowest_ask))
+            trade = Trade(bid, lowest_ask)
             if lowest_ask.is_exhausted():
                 self.asks.pop(ask_key)
 
-        return trades
+        return trade
 
-    def _try_sell(self, ask: Order) -> [Trade]:
+    def _try_sell(self, ask: Order) -> Trade or None:
         """
         Finalizes a trade between the passed ask and the highest bid order, if passed ask is lower or equal to the highest bid.
         Tries to finalize more trades until bid is exhausted.
         Returns a list of Trade or an empty list of none was finalized.
         """
-        trades = []
+        trade = None
         try:
             bid_key, highest_bid = self.bids.max_item()
         except ValueError:  # self.bids is empty: no bids to match passed ask
-            return trades
+            return trade
 
         if highest_bid >= ask:  # someone bid high enough and a trade will be made
-            trades.append(Trade(highest_bid, ask))
+            trade = Trade(highest_bid, ask)
             if highest_bid.is_exhausted():
                 self.bids.pop(bid_key)
 
-        return trades
+        return trade
 
     def pprint(self):
         print("\nBids:")

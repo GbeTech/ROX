@@ -15,7 +15,11 @@ class TestOrderBook(unittest.TestCase):
 
     def create_mock_orderbook(self):
         """
-        Creates a mock orderbook which contains two bids, and writes the data to <root>/logs/orderbook.log
+        Creates a mock orderbook which contains 4 bids (price, size):
+        - (100, 10)
+        - (70, 15)
+        - (99, 7)
+        - (101, 9)
         """
         order_book = OrderBook()
         order_book.add_order(self.create_bid(100, 10), sender_id=random_str())
@@ -25,18 +29,18 @@ class TestOrderBook(unittest.TestCase):
 
         return order_book
 
-    def test_add_ask_not_satisfied(self):
+    def test_add_ask_yes_bid_exhaust(self):
         print("\n BEFORE")
         order_book = self.create_mock_orderbook()
         order_book.pprint()
-        min_bid_key, min_bid = order_book.bids.min_item()
-        max_bid_key, max_bid = order_book.bids.max_item()
+        _, min_bid_before = order_book.bids.min_item()
+        _, max_bid_before = order_book.bids.max_item()
         self.assertEqual(order_book.bids.count, 4)
         self.assertEqual(order_book.asks.count, 0)
-        self.assertEqual(min_bid.size, 15)
-        self.assertEqual(min_bid.price, 70)
-        self.assertEqual(max_bid.size, 9)
-        self.assertEqual(max_bid.price, 101)
+        self.assertEqual(min_bid_before.size, 15)
+        self.assertEqual(min_bid_before.price, 70)
+        self.assertEqual(max_bid_before.size, 9)
+        self.assertEqual(max_bid_before.price, 101)
 
         order_book.add_order(self.create_ask(99, 26), random_str())
         print("\n AFTER")
@@ -45,19 +49,19 @@ class TestOrderBook(unittest.TestCase):
         self.assertEqual(order_book.bids.count, 1)
         self.assertEqual(order_book.asks.count, 0)
 
-        min_bid_key, min_bid = order_book.bids.min_item()
-        self.assertEqual(min_bid.size, 15)
-        self.assertEqual(min_bid.price, 70)
+        _, min_bid_after = order_book.bids.min_item()
+        self.assertEqual(min_bid_after.size, 15)
+        self.assertEqual(min_bid_after.price, 70)
+        self.assertEqual(min_bid_after, min_bid_before)
 
-        print(max_bid)
-        self.assertIsNone(max_bid.size)
-        self.assertTrue(max_bid.is_exhausted())
+        self.assertIsNone(max_bid_before.size)
+        self.assertTrue(max_bid_before.is_exhausted())
 
-        max_bid_key, max_bid = order_book.bids.max_item()
-        self.assertEqual(max_bid, min_bid)
-        # self.assertEqual(max_bid.price, 101)
+        _, max_bid_after = order_book.bids.max_item()
+        self.assertEqual(max_bid_after, min_bid_after)
+        self.assertNotEqual(max_bid_after, max_bid_before)
 
-    def test_add_ask_satisfied(self):
+    def test_add_ask_no_bid_exhaust(self):
         # print("\n BEFORE")
         order_book = self.create_mock_orderbook()
         # order_book.pprint()
@@ -82,6 +86,10 @@ class TestOrderBook(unittest.TestCase):
 
         self.assertEqual(max_bid.size, 1)
         self.assertEqual(max_bid.price, 101)
+
+    def test_show_orderbook(self):
+        order_book = self.create_mock_orderbook()
+        order_book.show_orderbook()
 
 
 if __name__ == '__main__':
