@@ -12,4 +12,4 @@ def random_str():
 
 
 def get_now():
-    return int(time.time())
+    return time.time()

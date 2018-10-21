@@ -30,11 +30,10 @@
 # when a trade occurs, the subscribers (traders) need to be notified of the trade,
 # and the trade should be logged
 import os
-from collections import OrderedDict
 
 from bintrees.abctree import _ABCTree
 
-from util import get_now, random_str
+from util import get_now
 import bintrees
 
 
@@ -94,15 +93,14 @@ class Order:
             self._size = value
 
     def _key(self):
+        """Orders are compared firstly by price. In case of equal prices, sizes are compared, then timestamp.
+        Two equal Orders must have the same price, size, and timestamp."""
         return self.price, self.size, self.timestamp
 
     def is_exhausted(self):
         return not self.size
 
     def __repr__(self):
-        return self.print_data()
-
-    def print_data(self):
         return f'timestamp: {self.timestamp}, side: {self.side}, price: {self.price}, size: {self.size}, id: {self.id}, sender_id: "{self.sender_id}"'
 
 
@@ -115,10 +113,12 @@ class Trade:
         self.seller_id = ask.sender_id
 
     @staticmethod
-    def _finalize(bid, ask):
-        """Finalizes the trade.
-        In case any side is "exhausted" (runs out of size), its size property is set to None via size property setter.
-        Returns the final trade size."""
+    def _finalize(bid: Order, ask: Order):
+        """Finalizes the trade between passed bid and ask.
+        In case any side is "exhausted" (runs out of size), its size property is set to None via Order.size property setter.
+        Assumes passed bid and ask can be finally traded.
+        Returns the final trade size.
+        """
         smallest_size = min(bid.size, ask.size)
         trade_size = smallest_size
         bid.size -= smallest_size
@@ -127,12 +127,11 @@ class Trade:
         return trade_size
 
     def _key(self):
+        """Trades are compared firstly by price. In case of equal prices, sizes are compared, then timestamp.
+        Two equal Trades must have the same price, size, and timestamp."""
         return self.price, self.size, self.timestamp
 
     def __repr__(self):
-        return self.print_data()
-
-    def print_data(self):
         return f'timestamp: {self.timestamp}, price: {self.price}, size: {self.size}, buyer_id: "{self.buyer_id}", seller_id: "{self.seller_id}"'
 
 
@@ -144,19 +143,23 @@ class OrderBook:
         self.trades: _ABCTree = bintrees.AVLTree()
         self.log_file_name = log_file_name
 
-    # Returns the highest bid and lowest ask orders
     def show_top(self):
-        best_bid = 0
-        best_ask = 0
-        return best_bid, best_ask
+        """Returns the highest bid and lowest ask orders"""
+        return self.bids.max_item(), self.asks.min_item()
 
-    # Returns the list of trades sorted by time
     def show_trades(self):
-        return
+        """Returns the list of trades sorted by time"""
+        return sorted(self.trades.values(), key=lambda trade: trade.timestamp)
 
-    # print the current state orderbook in a human readable format
     def show_orderbook(self):
-        self.pprint()
+        """Prints the current state orderbook in a human readable format"""
+        print("\nBids:")
+        for i, bid in enumerate(self.bids.values()):
+            print(f'({i}) {bid}')
+
+        print("\nAsks:")
+        for i, ask in enumerate(self.asks.values()):
+            print(f'({i}) {ask}')
 
     # called by add_order, when a trade has occurred, notify subscribers of the trade
     def notify_trade(self, trade_event, subscribers):
@@ -166,42 +169,60 @@ class OrderBook:
     # record the order (and trade) in a log
     def add_order(self, order: Order, sender_id):
         """
-        Adds an order to its suitable tree (bids or asks).
+        Logs the order to log file.
+        Adds the order to its suitable tree (bids or asks).
         Tries to finalize a trade or multiple trades between the order and existing bids / asks.
-        If a bid, ask, or both are exhausted during the process (i.e. ran out of "size"), they are deleted from their respective trees.
-        Returns a list of Trade if any were finalized, otherwise an empty list.
+        If a bid, ask, or both are exhausted during the process (i.e. ran out of "size"),
+        they are deleted from their respective trees.
+        Calls self._add_ask if order.side is Order.ASK, otherwise calls self._add_bid
         """
         order.sender_id = sender_id
-        # trades = []
-        order_key = order._key()
+        with open(os.path.join('logs', self.log_file_name), 'a') as log:
+            log.writelines([repr(order), '\n'])
+
         if order.side == Order.BID:
-            self.bids.insert(order_key, order)
-            while True:
-                trade = self._try_buy(order)
-                if not trade:
-                    break
-                self.trades.insert(trade._key(), trade)
-                if order.is_exhausted():
-                    self.bids.pop(order_key)
-                    break
+            self._add_bid(order)
 
         else:
-            self.asks.insert(order_key, order)
-            while True:
-                trade = self._try_sell(order)
-                if not trade:
-                    break
-                self.trades.insert(trade._key(), trade)
-                if order.is_exhausted():
-                    self.asks.pop(order_key)
-                    break
+            self._add_ask(order)
 
-        # with open(os.path.join('logs', self.log_file_name), 'a') as log:
-        #     log.writelines([order.print_data(), '\n'])
+    def _add_ask(self, ask: Order):
+        ask_key = ask._key()
+        self.asks.insert(ask_key, ask)
+        while True:
+            # Keep trying to finalize trades with current order (ask)
+            # Stop when no matching bid was found, or when ask is exhausted (i.e. sell order fully satisfied)
+            trade = self._try_sell(ask)
+            if not trade:
+                # No one who's willing to buy this high was found
+                break
+            self.trades.insert(trade._key(), trade)
+            if ask.is_exhausted():
+                # The order was fully sold
+                # Remove it from tree
+                self.asks.pop(ask_key)
+                break
+
+    def _add_bid(self, bid: Order):
+        bid_key = bid._key()
+        self.bids.insert(bid_key, bid)
+        while True:
+            # Keep trying to finalize trades with current order (bid)
+            # Stop when no matching ask was found, or when bid is exhausted (i.e. buy order fully satisfied)
+            trade = self._try_buy(bid)
+            if not trade:
+                # No one who's willing to sell this low was found
+                break
+            self.trades.insert(trade._key(), trade)
+            if bid.is_exhausted():
+                # The order was fully bought
+                # Remove it from tree
+                self.bids.pop(bid_key)
+                break
 
     # remove an order
     # record the removal order in the log
-    def remove_order(self, orderId, sender_id):
+    def remove_order(self, order_id, sender_id):
         return
 
     # def make_trade(self, order):
@@ -214,9 +235,9 @@ class OrderBook:
 
     def _try_buy(self, bid: Order) -> Trade or None:
         """
-        Finalizes a trade between the passed bid and the lowest ask order, if passed bid is higher or equal to the lowest ask.
-        Tries to finalize more trades until bid is exhausted.
-        Returns a list of Trade or an empty list of none was finalized.
+        Finalizes a trade between the passed bid and the lowest ask order in orderbook,
+        given passed bid is higher or equal to the lowest ask.
+        Returns a Trade if one was finalized, otherwise returns None.
         """
         trade = None
         try:
@@ -233,9 +254,9 @@ class OrderBook:
 
     def _try_sell(self, ask: Order) -> Trade or None:
         """
-        Finalizes a trade between the passed ask and the highest bid order, if passed ask is lower or equal to the highest bid.
-        Tries to finalize more trades until bid is exhausted.
-        Returns a list of Trade or an empty list of none was finalized.
+        Finalizes a trade between the passed ask and the highest bid order in orderbook,
+        given passed ask is lower or equal to the highest bid.
+        Returns a Trade if one was finalized, otherwise returns None.
         """
         trade = None
         try:
@@ -249,15 +270,6 @@ class OrderBook:
                 self.bids.pop(bid_key)
 
         return trade
-
-    def pprint(self):
-        print("\nBids:")
-        for bid in self.bids.values():
-            print(bid)
-
-        print("Asks:")
-        for ask in self.asks.values():
-            print(ask)
 
 
 """order_book = OrderBook()
