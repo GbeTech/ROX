@@ -6,15 +6,18 @@ import logging
 import os
 import re
 
+TESTS_FOLDER_NAME = 'tests'
+# Change current working directory to <root> and not /tests
+# All file paths assume working dir is root
 cwd = os.getcwd()
-m = re.fullmatch('.*tests$', cwd)
+m = re.fullmatch(f'.*{TESTS_FOLDER_NAME}$', cwd)
 if m:
     split = os.path.split(cwd)
     os.chdir(split[0])
 
 
 class TestOrderBook(unittest.TestCase):
-    REMOVE_LOG_FILES = False  # set True to delete all log files created by the tests
+    REMOVE_LOG_FILES = False  # set True to delete all log files created by the tests after done running
 
     @classmethod
     def tearDownClass(cls):
@@ -22,11 +25,12 @@ class TestOrderBook(unittest.TestCase):
         super().tearDownClass()
         if not cls.REMOVE_LOG_FILES:
             return
-        for _, _, testfiles in os.walk('tests'):
+        for _, _, testfiles in os.walk(TESTS_FOLDER_NAME):
             for file in testfiles:
                 test_logfile = re.fullmatch(r'^test_[a-z_]*\.log$', file)
                 if test_logfile:
-                    os.remove(os.path.join('tests', test_logfile.group(0)))
+                    # file is a test log file created by one of the test methods
+                    os.remove(os.path.join(TESTS_FOLDER_NAME, test_logfile.group(0)))
 
     @staticmethod
     def create_bid(price, size):
@@ -62,10 +66,11 @@ class TestOrderBook(unittest.TestCase):
         super().tearDown()
         current_logger = logging.getLogger()
         handler = current_logger.handlers[0]
-        current_logger.removeHandler(handler.close())
+        handler.close()
+        current_logger.removeHandler(handler)
 
     def test_add_ask_yes_bid_exhaust(self):
-        order_book = self.create_mock_orderbook(f'tests/{self._testMethodName}.log')
+        order_book = self.create_mock_orderbook(f'{TESTS_FOLDER_NAME}/{self._testMethodName}.log')
         # print("\n BEFORE")
         # order_book.show_orderbook()
         _, min_bid_before = order_book.bids.min_item()
@@ -98,7 +103,7 @@ class TestOrderBook(unittest.TestCase):
         # logging.getLogger().handlers[0].baseFilename
 
     def test_add_ask_no_bid_exhaust(self):
-        order_book = self.create_mock_orderbook(f'tests/{self._testMethodName}.log')
+        order_book = self.create_mock_orderbook(f'{TESTS_FOLDER_NAME}/{self._testMethodName}.log')
         # print("\n BEFORE")
         # order_book.pprint()
         min_bid_key, min_bid = order_book.bids.min_item()
@@ -124,12 +129,11 @@ class TestOrderBook(unittest.TestCase):
         self.assertEqual(max_bid.price, 101)
 
     def test_show_orderbook(self):
-        order_book = self.create_mock_orderbook(f'tests/{self._testMethodName}.log')
+        order_book = self.create_mock_orderbook(f'{TESTS_FOLDER_NAME}/{self._testMethodName}.log')
         order_book.show_orderbook()
 
     def test_show_trades(self):
-        from time import sleep
-        order_book = self.create_mock_orderbook(f'tests/{self._testMethodName}.log')
+        order_book = self.create_mock_orderbook(f'{TESTS_FOLDER_NAME}/{self._testMethodName}.log')
         for _ in range(26):
             order_book.add_order(self.create_ask(99, 1), random_str())
             # sleep(0.1)
@@ -140,7 +144,7 @@ class TestOrderBook(unittest.TestCase):
         self.assertTrue(trades_are_timestamp_sorted)
 
     def test_logger(self):
-        new_log_file = f'tests/{self._testMethodName}.log'
+        new_log_file = f'{TESTS_FOLDER_NAME}/{self._testMethodName}.log'
         order_book = OrderBook(new_log_file)
         bid_sender_id = random_str()
         order_book.add_order(self.create_bid(100, 5), bid_sender_id)

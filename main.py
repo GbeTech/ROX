@@ -35,7 +35,6 @@ from bintrees.abctree import _ABCTree
 from util import get_now
 import bintrees
 import logging
-import os
 
 
 class Order:
@@ -141,7 +140,7 @@ class Logger:
         self.filename = filename
         logging.basicConfig(format='%(message)s',
                             filename=filename,
-                            level=logging.DEBUG,
+                            level=logging.INFO,
                             filemode='w')
 
     def log_bid(self, bid):
