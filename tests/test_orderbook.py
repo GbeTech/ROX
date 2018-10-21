@@ -188,7 +188,7 @@ class TestOrderBook(unittest.TestCase):
 
         self.assertEqual(order_book.bids.count, 0)
 
-    def test_logger(self):
+    def test_logger_no_remove(self):
         new_log_file = f'{TESTS_FOLDER_NAME}/{self._testMethodName}.log'
         order_book = OrderBook(new_log_file)
         bid_sender_id = random_str()
@@ -218,8 +218,36 @@ class TestOrderBook(unittest.TestCase):
                      ['\t--> ASK id: \d{13} now has size: 2'],
                      ['\t--> BID id: \d{13} now has been exhausted']]
             for i, line in enumerate(lines):
-                for j, order_prop in enumerate(line.split(', ')):
-                    self.assertRegex(order_prop, regex[i][j])
+                self.assertRegex(line, regex[i])
+                # for j, order_prop in enumerate(line.split(', ')):
+                #     self.assertRegex(order_prop, regex[i][j])
+
+    def test_logger_yes_remove(self):
+        new_log_file = f'{TESTS_FOLDER_NAME}/{self._testMethodName}.log'
+        order_book = OrderBook(new_log_file)
+        bid = self.create_bid(100, 5)
+        order_book.add_order(bid, random_str())
+        ask = self.create_ask(90, 7)
+        order_book.add_order(ask, random_str())
+        with self.assertRaises(KeyError) as e:
+            order_book.remove_order(bid.id, bid.sender_id)
+            err_regex = '^Tried to remove order but no such order exists\.\\nOrder id: \d{13}\. Order key: \(100, 5\)$'
+            self.assertRegex(e.args[0], err_regex)
+
+        order_book.remove_order(ask.id, ask.sender_id)
+        with open(new_log_file, 'r') as f:
+            lines = f.readlines()
+            # the data in the now created log file is expected to match the following regex expressions
+            regex = [
+                'BID \| timestamp: \d{10}\.\d{5,7}, side: b, price: 100, size: 5, id: \d{13}, sender_id: "[a-zA-Z0-9]{8}"',
+                'ASK \| timestamp: \d{10}\.\d{5,7}, side: a, price: 90, size: 7, id: \d{13}, sender_id: "[a-zA-Z0-9]{8}"',
+                'TRADE \| timestamp: \d{10}\.\d{5,7}, price: 100, size: 5, buyer_id: "[a-zA-Z0-9]{8}", seller_id: "[a-zA-Z0-9]{8}"',
+                '\t--> ASK id: \d{13} now has size: 2',
+                '\t--> BID id: \d{13} now has been exhausted',
+                'ASK (rm) | timestamp: \d{10}\.\d{5,7}, side: a, price: 90, size: 2, id: \d{13}, sender_id: "[a-zA-Z0-9]{8}"'
+                ]
+            for i, line in enumerate(lines):
+                self.assertRegex(line, regex[i])
 
 
 if __name__ == '__main__':

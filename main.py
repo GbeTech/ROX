@@ -380,8 +380,8 @@ class OrderBook:
         else:  # order is not a bid
             ask_to_remove = self.asks.get(order_key)
             if not ask_to_remove:
-                raise KeyError(f'''Tried to remove order but no such order exists.
-                Order id: {order_id}. Order key: {order_key}''')
+                raise KeyError(
+                    f'Tried to remove order but no such order exists.\nOrder id: {order_id}. Order key: {order_key}')
 
             if ask_to_remove.sender_id == sender_id:
                 self.logger.log_ask(ask_to_remove, removed=True)
