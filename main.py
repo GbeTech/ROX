@@ -37,6 +37,11 @@ import bintrees
 import logging
 
 
+class Subscriber:
+    def __init__(self):
+        pass
+
+
 class Order:
     # order sides
     BID = "b"
@@ -58,16 +63,6 @@ class Order:
         return self._key() == other._key()
 
     def __init__(self, side, price, size):
-        """
-        :param side:
-        :type side: str
-        :param price:
-        :type price: int
-        :param size:
-        :type size: int
-        :param id:
-        :type id: int
-        """
         self.timestamp = get_now()  # since epoch
         if side != self.BID and side != self.ASK:
             raise ValueError(f'''Tried to initialize Order instance with illegal order side arg: "{side}". 
@@ -191,7 +186,7 @@ class OrderBook:
             print(f'({i}) {ask}')
 
     # called by add_order, when a trade has occurred, notify subscribers of the trade
-    def notify_trade(self, trade_event, subscribers):
+    def notify_trade(self, trade_event: Trade, subscribers: [Subscriber]):
         return
 
     # Add an order, notify if a trade has occurred
@@ -284,6 +279,8 @@ class OrderBook:
         if lowest_ask <= bid:  # someone offered a low-enough sell price and a trade will be made
             trade = Trade(bid, lowest_ask)
             self.logger.log_trade(trade, bid, lowest_ask)
+            trade_subscribers = bid.subscribers.extend(lowest_ask.subscribers)
+            self.notify_trade(trade, trade_subscribers)
             if lowest_ask.is_exhausted():
                 self.asks.pop(ask_key)
 
