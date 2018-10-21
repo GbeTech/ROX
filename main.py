@@ -1,38 +1,3 @@
-# implement an orderbook,
-# and a test which creates orders, sends them to the book,
-# and prints the resulting state of the orderbook/trades.
-
-# 1.Implement an order book class: here is a sample python API,
-# and a unit test to add bids, asks, show the orderbook afterwards,
-# and show the trades
-
-
-# The orderbook contains bid orders and ask orders,
-# Each order has the following members:
-#   Time: the time at which the order was sent
-#   Side: Bid/Ask - bid means buy, and ask means sell
-#   Size: the amount to trade
-#   Price: the price at which to trade
-#   OrderId: a unique tracking number for the order
-#   Name: the name/Id of the person doing the order
-# A trade occurs when an order was entered that intersects an existing order,
-# Each Trade has the following members:
-#   Time
-#   Price
-#   Size
-#   BuyerId
-#   SellerId
-# for example:
-# if the orderbook contains a bid order at price=100, size=10
-# and we just receive an ask order at price=99, size = 12
-# a trade will happen at price 100, for size 10,
-# and the orderbook will now contain an ask order with price=99, size=2
-# when a trade occurs, the subscribers (traders) need to be notified of the trade,
-# and the trade should be logged
-from typing import Dict, Any
-
-from bintrees.abctree import _ABCTree
-
 from util import get_now
 import bintrees
 import logging
@@ -93,8 +58,9 @@ class Order:
     def __init__(self, side, price, size):
         self.timestamp = get_now()  # since epoch
         if side != self.BID and side != self.ASK:
-            raise ValueError(f'''Tried to initialize Order instance with illegal order side arg: "{side}". 
-                Only "{self.BID}" or "{self.ASK}" allowed.''')
+            msg = '\n'.join([f'Tried to initialize Order instance with illegal order side arg: "{side}".',
+                             f'Only "{self.BID}" or "{self.ASK}" allowed.'])
+            raise ValueError(msg)
 
         self.side = side  # "b" (bid) or "a" (ask)
         self._size = size
@@ -248,20 +214,22 @@ class Subscriber:
 class OrderBook:
 
     def __init__(self, logfile_full_path='logs/orderbook.log'):
-        self.bids: _ABCTree = bintrees.AVLTree()
-        self.asks: _ABCTree = bintrees.AVLTree()
+        self.bids = bintrees.AVLTree()
+        self.asks = bintrees.AVLTree()
 
         # This is to retrieve an order *by order_id* from the trees in O(log(n)). (self.remove_order())
         # self.bids and self.asks are indexed by Order._key(), which is (self.price, self.size).
         self.order_id_key_translate = {}
         self.trades = {}
-        self.subscribers: Dict[str, Subscriber] = {}
+        self.subscribers = {}
         self.logger = Logger(logfile_full_path)
 
     # O(log(n))
     def show_top(self):
-        """Returns the highest bid and lowest ask orders"""
-        return self.bids.max_item(), self.asks.min_item()
+        """Returns the highest bid and lowest ask orders."""
+        _, highest_bid = self.bids.max_item()
+        _, lowest_ask = self.asks.min_item()
+        return highest_bid, lowest_ask
 
     # O(n)
     def show_trades(self):
@@ -365,6 +333,7 @@ class OrderBook:
             else:
                 should_continue = False
 
+    # O(log(n))
     def remove_order(self, order_id, sender_id):
         """
         Removes an order from its respective tree.
@@ -380,8 +349,9 @@ class OrderBook:
         else:  # order is not a bid
             ask_to_remove = self.asks.get(order_key)
             if not ask_to_remove:
-                raise KeyError(
-                    f'Tried to remove order but no such order exists.\nOrder id: {order_id}. Order key: {order_key}')
+                msg = '\n'.join(['Tried to remove order but no such order exists.',
+                                 f'Order id: {order_id}. Order key: {order_key}'])
+                raise KeyError(msg)
 
             if ask_to_remove.sender_id == sender_id:
                 self.logger.log_ask(ask_to_remove, removed=True)

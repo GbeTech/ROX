@@ -66,6 +66,12 @@ class TestOrderBook(unittest.TestCase):
         """
         super().tearDown()
         current_logger = logging.getLogger()
+
+        if not current_logger.handlers:
+            # "test_bad_order_side()" doesn't instanciate an OrderBook
+            # so no logging is done == no handlers to close and remove
+            return
+
         handler = current_logger.handlers[0]
         handler.close()
         current_logger.removeHandler(handler)
@@ -154,14 +160,51 @@ class TestOrderBook(unittest.TestCase):
             self.assertRegex(line, regex[i])
 
     def test_show_trades(self):
+        import time
         order_book = self.create_mock_orderbook(f'{TESTS_FOLDER_NAME}/{self._testMethodName}.log')
         for _ in range(26):
             order_book.add_order(self.create_ask(99, 1), random_str())
+            time.sleep(0.01)
 
         trades = order_book.show_trades()
         trades_are_timestamp_sorted = all(
             [trade.timestamp < trades[i + 1].timestamp for i, trade in enumerate(trades[:-1])])
         self.assertTrue(trades_are_timestamp_sorted)
+
+    def test_show_top(self):
+        new_log_file = f'{TESTS_FOLDER_NAME}/{self._testMethodName}.log'
+        order_book = OrderBook(new_log_file)
+        order_book.add_order(self.create_ask(100, 30), random_str())
+        order_book.add_order(self.create_ask(100, 29), random_str())
+        order_book.add_order(self.create_bid(10, 3), random_str())
+        order_book.add_order(self.create_bid(10, 4), random_str())
+
+        highest_bid, lowest_ask = order_book.show_top()
+
+        # Test overridden Order comparison functions (by _key())
+        self.assertTrue((highest_bid.price, highest_bid.size), (10, 4))
+        self.assertTrue((lowest_ask.price, lowest_ask.size), (100, 29))
+
+        order_book.add_order(self.create_ask(99, 28), random_str())
+        order_book.add_order(self.create_bid(11, 5), random_str())
+
+        highest_bid, lowest_ask = order_book.show_top()
+        self.assertTrue((highest_bid.price, highest_bid.size), (11, 5))
+        self.assertTrue((lowest_ask.price, lowest_ask.size), (99, 28))
+
+    def test_order_size_setter(self):
+        order = Order("a", 100, 5)
+        order.size = -5
+        self.assertIsNone(order.size)
+
+    def test_bad_order_side(self):
+        bad_side = "not a nor b"
+        err_regex = '\n'.join([
+            f'^Tried to initialize Order instance with illegal order side arg: "{bad_side}"\.',
+            'Only "b" or "a" allowed\.$'
+            ])
+        with self.assertRaisesRegex(ValueError, err_regex):
+            Order(bad_side, 100, 5)
 
     def test_remove_order(self):
         order_book = self.create_mock_orderbook(f'{TESTS_FOLDER_NAME}/{self._testMethodName}.log')
@@ -191,10 +234,8 @@ class TestOrderBook(unittest.TestCase):
     def test_logger_no_remove(self):
         new_log_file = f'{TESTS_FOLDER_NAME}/{self._testMethodName}.log'
         order_book = OrderBook(new_log_file)
-        bid_sender_id = random_str()
-        order_book.add_order(self.create_bid(100, 5), bid_sender_id)
-        ask_sender_id = random_str()
-        order_book.add_order(self.create_ask(90, 7), ask_sender_id)
+        order_book.add_order(self.create_bid(100, 5), random_str())
+        order_book.add_order(self.create_ask(90, 7), random_str())
         with open(new_log_file, 'r') as f:
             lines = f.readlines()
             # the data in the now created log file is expected to match the following regex expressions
