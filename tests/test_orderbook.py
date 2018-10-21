@@ -139,6 +139,20 @@ class TestOrderBook(unittest.TestCase):
         for i, line in enumerate(lines):
             self.assertRegex(line, regex[i])
 
+        # remove all bids
+        for bid in list(order_book.bids.values()):
+            order_book.remove_order(bid.id, bid.sender_id)
+
+        regex = ['^$',
+                 '^Bids:$',
+                 '-- No bids --',
+                 '^Asks:$',
+                 '-- No asks --',
+                 ]
+
+        for i, line in enumerate(order_book.show_orderbook().splitlines()):
+            self.assertRegex(line, regex[i])
+
     def test_show_trades(self):
         order_book = self.create_mock_orderbook(f'{TESTS_FOLDER_NAME}/{self._testMethodName}.log')
         for _ in range(26):
