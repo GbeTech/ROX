@@ -369,15 +369,21 @@ class OrderBook:
         Records the removal in the log.
         """
         order_key = self.order_id_key_translate[order_id]
-        try:
-            removed_bid = self.bids.pop(order_key)
-            if removed_bid.sender_id == sender_id:
-                self.logger.log_bid(removed_bid, removed=True)
+        bid_to_remove = self.bids.get(order_key)
+        if bid_to_remove:
+            if bid_to_remove.sender_id == sender_id:
+                self.logger.log_bid(bid_to_remove, removed=True)
+                self.bids.remove(order_key)
 
-        except KeyError:  # order is not a bid
-            removed_ask = self.asks.pop(order_key)
-            if removed_ask.sender_id == sender_id:
-                self.logger.log_ask(removed_ask, removed=True)
+        else:  # order is not a bid
+            ask_to_remove = self.asks.get(order_key)
+            if not ask_to_remove:
+                raise KeyError(f'''Tried to remove order but no such order exists.
+                Order id: {order_id}. Order key: {order_key}''')
+
+            if ask_to_remove.sender_id == sender_id:
+                self.logger.log_ask(ask_to_remove, removed=True)
+                self.asks.remove(order_key)
 
     def _subscribers_of_orders(self, *orders):
         """Returns a list of Subscribers that have subscribed to any of the passed orders"""
@@ -396,8 +402,7 @@ class OrderBook:
             return None
 
         ask_key, lowest_ask = self.asks.min_item()
-        if lowest_ask > bid:
-            return None
+
         trade = None
         if lowest_ask <= bid:  # someone offered a low-enough sell price and a trade will be made
             trade = Trade(bid, lowest_ask)
@@ -424,11 +429,10 @@ class OrderBook:
         If a trade was finalized, logs the trade to the log and notifies all of its subscribers.
         If a trade was not finalized, returns None.
         """
-        try:
-            bid_key, highest_bid = self.bids.max_item()
-        except ValueError:  # self.bids is empty
+        if self.bids.is_empty():
             return None
 
+        bid_key, highest_bid = self.bids.max_item()
         trade = None
         if highest_bid >= ask:  # someone bid high enough and a trade will be made
             trade = Trade(highest_bid, ask)

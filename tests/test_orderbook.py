@@ -151,6 +151,22 @@ class TestOrderBook(unittest.TestCase):
         order_book.remove_order(ask.id, ask.sender_id)
         self.assertEqual(order_book.asks.count, 0)
 
+        # Copy the values, so removing their references won't interfere with testing
+        bids_copy = list(order_book.bids.values())
+        bids_ids = [bid.id for bid in bids_copy]
+
+        for bid_id in bids_ids:
+            # Should not remove orders with no matching sender id.
+            order_book.remove_order(bid_id, "BAD SENDER ID")
+
+        self.assertEqual(order_book.bids.count, 3)  # no bids_copy were removed
+
+        for bid in bids_copy:
+            # Should remove
+            order_book.remove_order(bid.id, bid.sender_id)
+
+        self.assertEqual(order_book.bids.count, 0)
+
     def test_logger(self):
         new_log_file = f'{TESTS_FOLDER_NAME}/{self._testMethodName}.log'
         order_book = OrderBook(new_log_file)
