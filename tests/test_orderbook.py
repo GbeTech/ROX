@@ -198,29 +198,15 @@ class TestOrderBook(unittest.TestCase):
         with open(new_log_file, 'r') as f:
             lines = f.readlines()
             # the data in the now created log file is expected to match the following regex expressions
-            regex = [['BID \| timestamp: \d{10}\.\d{5,7}',
-                      '^side: b$',
-                      '^price: 100$',
-                      '^size: 5$',
-                      'id: \d{13}',
-                      f'sender_id: "{bid_sender_id}"'],
-                     ['ASK \| timestamp: \d{10}\.\d{5,7}',
-                      '^side: a$',
-                      '^price: 90$',
-                      '^size: 7$',
-                      'id: \d{13}',
-                      f'sender_id: "{ask_sender_id}"'],
-                     ['TRADE \| timestamp: \d{10}\.\d{5,7}',
-                      '^price: 100$',
-                      '^size: 5$',
-                      f'buyer_id: "{bid_sender_id}"',
-                      f'seller_id: "{ask_sender_id}"'],
-                     ['\t--> ASK id: \d{13} now has size: 2'],
-                     ['\t--> BID id: \d{13} now has been exhausted']]
+            regex = [
+                'BID \| timestamp: \d{10}\.\d{5,7}, side: b, price: 100, size: 5, id: \d{13}, sender_id: "[a-zA-Z0-9]{8}"',
+                'ASK \| timestamp: \d{10}\.\d{5,7}, side: a, price: 90, size: 7, id: \d{13}, sender_id: "[a-zA-Z0-9]{8}"',
+                'TRADE \| timestamp: \d{10}\.\d{5,7}, price: 100, size: 5, buyer_id: "[a-zA-Z0-9]{8}", seller_id: "[a-zA-Z0-9]{8}"',
+                '\t--> ASK id: \d{13} now has size: 2',
+                '\t--> BID id: \d{13} now has been exhausted',
+                ]
             for i, line in enumerate(lines):
                 self.assertRegex(line, regex[i])
-                # for j, order_prop in enumerate(line.split(', ')):
-                #     self.assertRegex(order_prop, regex[i][j])
 
     def test_logger_yes_remove(self):
         new_log_file = f'{TESTS_FOLDER_NAME}/{self._testMethodName}.log'
