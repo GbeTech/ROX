@@ -6,6 +6,12 @@ import logging
 import os
 import re
 
+cwd = os.getcwd()
+m = re.fullmatch('.*tests$', cwd)
+if m:
+    split = os.path.split(cwd)
+    os.chdir(split[0])
+
 
 class TestOrderBook(unittest.TestCase):
     REMOVE_LOG_FILES = False  # set True to delete all log files created by the tests
