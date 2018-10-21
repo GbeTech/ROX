@@ -29,6 +29,8 @@
 # and the orderbook will now contain an ask order with price=99, size=2
 # when a trade occurs, the subscribers (traders) need to be notified of the trade,
 # and the trade should be logged
+from typing import Dict, Any
+
 from bintrees.abctree import _ABCTree
 
 from util import get_now
@@ -44,11 +46,17 @@ class Logger:
                             level=logging.INFO,
                             filemode='w')
 
-    def log_bid(self, bid):
-        logging.info(f'BID | {bid}')
+    def log_bid(self, bid, removed=False):
+        if removed:
+            logging.info(f'BID (rm) | {bid}')
+        else:
+            logging.info(f'BID | {bid}')
 
-    def log_ask(self, ask):
-        logging.info(f'ASK | {ask}')
+    def log_ask(self, ask, removed=False):
+        if removed:
+            logging.info(f'ASK (rm) | {ask}')
+        else:
+            logging.info(f'ASK | {ask}')
 
     def log_trade(self, trade):
         logging.info(f'TRADE | {trade}')
@@ -127,6 +135,10 @@ class Trade:
         self.price = bid.price
         self.buyer_id = bid.sender_id
         self.seller_id = ask.sender_id
+
+        # The actual bid and ask objects are used when
+        # logging a trade (order.id and order.size are needed)
+        # and when notifying subscribers
         self.bid = bid
         self.ask = ask
 
@@ -164,6 +176,8 @@ class Subscriber:
     def __init__(self, sender_id):
         self.id = sender_id
         self.email = f"{self.id}@example.com"
+
+        # Values are not removed or changed in self.orders_ids, regardless or the state of the order.
         self.orders_ids = []
 
     def is_subscribed_to_any(self, *orders):
@@ -173,18 +187,18 @@ class Subscriber:
                 return True
         return False
 
-    def notify(self, trade_event: Trade):
+    def notify(self, trade: Trade):
         """Notifies the subscriber of a trade event relating to one her of orders.
         Sends an email to her address, specifying the trade's details, total expense/income, and the status of the order."""
         return
         import time
 
-        if trade_event.buyer_id == self.id:
+        if trade.buyer_id == self.id:
             # Subscriber is on the buyer's side
-            msg = self._generate_bidder_msg(trade_event)
+            msg = self._generate_bidder_msg(trade)
         else:
             # Subscriber is on the sellers's side
-            msg = self._generate_asker_msg(trade_event)
+            msg = self._generate_asker_msg(trade)
 
         _connect = lambda port: print(f'\n***Server connected to port: {port}')
         _sendmail = lambda address, text: (print(f'\nSending email to {address}:\n\t{text}'),
@@ -200,34 +214,34 @@ class Subscriber:
         mock_server['sendmail'](self.email, msg)
         mock_server['quit']()
 
-    def _generate_asker_msg(self, trade_event):
-        trade_total_value = trade_event.total_value()
-        bid_ask_difference = trade_event.bid_ask_difference()
+    def _generate_asker_msg(self, trade):
+        trade_total_value = trade.total_value()
+        bid_ask_difference = trade.bid_ask_difference()
         msg = f'''
-            A trade has been completed with your ask order, id: {trade_event.ask.id}.
-            {trade_event.size} units have been sold at {trade_event.price}$ each. 
+            A trade has been completed with your ask order, id: {trade.ask.id}.
+            {trade.size} units have been sold at {trade.price}$ each. 
             Total income: {trade_total_value}$.'''
         if bid_ask_difference:
             msg += f'''
-            This is {bid_ask_difference} additional dollars a unit, compared to your original sell offer (at {trade_event.ask.price}$),
-            which translate to {bid_ask_difference*trade_event.size}$ above what you have originally planned.  
+            This is {bid_ask_difference} additional dollars a unit, compared to your original sell offer (at {trade.ask.price}$),
+            which translate to {bid_ask_difference*trade.size}$ above what you have originally planned.  
             '''
-        if trade_event.ask.is_exhausted():
+        if trade.ask.is_exhausted():
             msg += 'Your ask requirements were fully satisfied.'
         else:
-            msg += f'Your ask was not exhausted: {trade_event.ask.size} units left to sell.'
+            msg += f'Your ask was not exhausted: {trade.ask.size} units left to sell.'
         return msg
 
-    def _generate_bidder_msg(self, trade_event):
+    def _generate_bidder_msg(self, trade):
         msg = f'''
-            A trade has been completed with your bid order, id: {trade_event.bid.id}.
-            {trade_event.size} units have been bought at {trade_event.price}$ each.
-            Total expenses: {trade_event.total_value()}$. 
+            A trade has been completed with your bid order, id: {trade.bid.id}.
+            {trade.size} units have been bought at {trade.price}$ each.
+            Total expenses: {trade.total_value()}$. 
             '''
-        if trade_event.bid.is_exhausted():
+        if trade.bid.is_exhausted():
             msg += 'Your bid requirements were fully satisfied.'
         else:
-            msg += f'Your bid was not exhausted: {trade_event.bid.size } units left to buy.'
+            msg += f'Your bid was not exhausted: {trade.bid.size } units left to buy.'
         return msg
 
 
@@ -236,8 +250,12 @@ class OrderBook:
     def __init__(self, logfile_full_path='logs/orderbook.log'):
         self.bids: _ABCTree = bintrees.AVLTree()
         self.asks: _ABCTree = bintrees.AVLTree()
+
+        # This is to retrieve an order *by order_id* from the trees in O(log(n)). (self.remove_order())
+        # self.bids and self.asks are indexed by Order._key(), which is (self.price, self.size).
+        self.order_id_key_translate = {}
         self.trades = {}
-        self.subscribers = {}
+        self.subscribers: Dict[str, Subscriber] = {}
         self.logger = Logger(logfile_full_path)
 
     # O(log(n))
@@ -254,22 +272,28 @@ class OrderBook:
     def show_orderbook(self):
         """Prints the current state orderbook in a human readable format"""
         print("\nBids:")
-        for i, bid in enumerate(self.bids.values()):
-            print(f'({i}) {bid}')
+        if self.bids.is_empty():
+            print('-- No bids --')
+        else:
+            for i, bid in enumerate(self.bids.values()):
+                print(f'({i}) {bid}')
 
         print("\nAsks:")
-        for i, ask in enumerate(self.asks.values()):
-            print(f'({i}) {ask}')
+        if self.asks.is_empty():
+            print('-- No asks --')
+        else:
+            for i, ask in enumerate(self.asks.values()):
+                print(f'({i}) {ask}')
 
-    def notify_trade(self, trade_event, subscribers):
+    def notify_trade(self, trade, subscribers):
         """Notifies each of the passed subscribers of the trade event."""
         for subscriber in subscribers:
-            subscriber.notify(trade_event)
-        return
+            subscriber.notify(trade)
 
     # O(log(n))
     def add_order(self, order: Order, sender_id):
         """
+        Indexes passed order by order.id in self.order_id_key_translate, for O(log(n)) retrieval in self.remove_order().
         Updates the subscriptions list of the sender to include the current order id (creates a new Subscriber if needed).
         Calls self._add_ask if order.side is Order.ASK, otherwise calls self._add_bid
         Logs the order to log file.
@@ -280,6 +304,7 @@ class OrderBook:
         they are deleted from their respective trees.
         """
         order.sender_id = sender_id
+        self.order_id_key_translate[order.id] = order._key()
 
         # Add order to subscriber's orders. Create new subscriber if none was found
         subscriber: Subscriber = self.subscribers.get(sender_id)
@@ -338,14 +363,21 @@ class OrderBook:
             else:
                 should_continue = False
 
-    # remove an order
-    # record the removal order in the log
     def remove_order(self, order_id, sender_id):
-        import asyncio
-        for bid_key, bid in self.bids.items():
-            if bid.id == order_id and bid.sender_id == sender_id:
-                self.bids.pop(bid_key)
-                return
+        """
+        Removes an order from its respective tree.
+        Records the removal in the log.
+        """
+        order_key = self.order_id_key_translate[order_id]
+        try:
+            removed_bid = self.bids.pop(order_key)
+            if removed_bid.sender_id == sender_id:
+                self.logger.log_bid(removed_bid, removed=True)
+
+        except KeyError:  # order is not a bid
+            removed_ask = self.asks.pop(order_key)
+            if removed_ask.sender_id == sender_id:
+                self.logger.log_ask(removed_ask, removed=True)
 
     def _subscribers_of_orders(self, *orders):
         """Returns a list of Subscribers that have subscribed to any of the passed orders"""
@@ -360,11 +392,12 @@ class OrderBook:
         If a trade was finalized, logs the trade to the log and notifies all of its subscribers.
         If a trade was not finalized, returns None.
         """
-        try:
-            ask_key, lowest_ask = self.asks.min_item()
-        except ValueError:  # self.asks is empty
+        if self.asks.is_empty():
             return None
 
+        ask_key, lowest_ask = self.asks.min_item()
+        if lowest_ask > bid:
+            return None
         trade = None
         if lowest_ask <= bid:  # someone offered a low-enough sell price and a trade will be made
             trade = Trade(bid, lowest_ask)
