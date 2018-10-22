@@ -1,5 +1,5 @@
 from util import get_now
-import bintrees
+from bintrees import AVLTree
 import logging
 
 ALLOW_SUBSCRIBERS_NOTIFICATION = False
@@ -157,12 +157,9 @@ class Subscriber:
 
     def is_subscribed_to_any(self, *orders):
         """Returns True if subscribed to any of the passed orders"""
-        for order in orders:
-            if order.id in self.orders_ids:
-                return True
-        return False
+        return any(order.id in self.orders_ids for order in orders)
 
-    def notify(self, trade: Trade):
+    def notify(self, trade):
         """Notifies the subscriber of a trade event relating to one her of orders.
         Sends an email to her address, specifying the trade's details, total expense/income, and the status of the order."""
         import time
@@ -196,6 +193,7 @@ class Subscriber:
             A trade has been completed with your ask order, id: {trade.ask.id}.
             {trade.size} units have been sold at {trade.price}$ each. 
             Total income: {trade_total_value}$.'''
+
         if bid_ask_difference:
             msg += f'''
             Those are {bid_ask_difference} additional dollars per unit, compared to your original sell offer (at {trade.ask.price}$),
@@ -224,8 +222,8 @@ class Subscriber:
 class OrderBook:
 
     def __init__(self, logfile_full_path='logs/orderbook.log'):
-        self.bids = bintrees.AVLTree()
-        self.asks = bintrees.AVLTree()
+        self.bids = AVLTree()
+        self.asks = AVLTree()
 
         # This is to retrieve an order *by order_id* from the trees in O(log(n)). (self.remove_order())
         # self.bids and self.asks are indexed by Order._key(), which is (self.price, self.size).
@@ -285,10 +283,12 @@ class OrderBook:
         they are deleted from their respective trees.
         """
         order.sender_id = sender_id
+
+        # used in remove_order to keep O(log(n)) when retrieving order by order_id
         self.order_id_key_translate[order.id] = order._key()
 
         # Add order to subscriber's orders. Create new subscriber if none was found
-        subscriber: Subscriber = self.subscribers.get(sender_id)
+        subscriber = self.subscribers.get(sender_id)
         if subscriber:
             subscriber.orders_ids.append(order.id)
         else:
@@ -305,8 +305,10 @@ class OrderBook:
     # O(log(n))
     def _add_ask(self, ask: Order):
         self.logger.log_ask(ask)
+
         ask_key = ask._key()
         self.asks.insert(ask_key, ask)
+
         should_continue = True
         while should_continue:
             # Keep trying to finalize trades with current order (ask)
@@ -318,7 +320,7 @@ class OrderBook:
                 if ask.is_exhausted():
                     # The order was fully sold
                     # Remove it from tree
-                    self.asks.pop(ask_key)
+                    self.asks.remove(ask_key)
                     should_continue = False
             else:
                 should_continue = False
@@ -339,7 +341,7 @@ class OrderBook:
                 if bid.is_exhausted():
                     # The order was fully bought
                     # Remove it from tree
-                    self.bids.pop(bid_key)
+                    self.bids.remove(bid_key)
                     should_continue = False
             else:
                 should_continue = False
@@ -368,11 +370,6 @@ class OrderBook:
                 self.logger.log_ask(ask_to_remove, removed=True)
                 self.asks.remove(order_key)
 
-    def _subscribers_of_orders(self, *orders):
-        """Returns a list of Subscribers that have subscribed to any of the passed orders"""
-        return [sub for sub in self.subscribers.values()
-                if sub.is_subscribed_to_any(*orders)]
-
     # O(log(n))
     def _try_buy(self, bid: Order) -> Trade or None:
         """
@@ -400,7 +397,7 @@ class OrderBook:
             self.notify_trade(trade, trade_subscribers)
 
             if lowest_ask.is_exhausted():
-                self.asks.pop(ask_key)
+                self.asks.remove(ask_key)
 
         return trade
 
@@ -428,6 +425,11 @@ class OrderBook:
             self.notify_trade(trade, trade_subscribers)
 
             if highest_bid.is_exhausted():
-                self.bids.pop(bid_key)
+                self.bids.remove(bid_key)
 
         return trade
+
+    def _subscribers_of_orders(self, *orders):
+        """Returns a list of Subscribers that have subscribed to any of the passed orders"""
+        return [sub for sub in self.subscribers.values()
+                if sub.is_subscribed_to_any(*orders)]
