@@ -129,3 +129,6 @@ misc/scratches.html
 misc/
 deletelater.py
 ROX.rar
+
+.~lock*
+.gitignore.backup
